@@ -1,8 +1,8 @@
 package schema
 
 import (
-	"day2-reflect-schema/dialect"
 	"go/ast"
+	"peeorm/dialect"
 	"reflect"
 )
 

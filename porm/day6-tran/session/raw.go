@@ -10,6 +10,7 @@ import (
 )
 
 type Session struct {
+	tx       *sql.Tx // 操作事务的指针
 	db       *sql.DB // 连接数据库之后操作数据库的指针
 	dialect  dialect.Dialect
 	refTable *schema.Schema
@@ -17,6 +18,17 @@ type Session struct {
 	sql      strings.Builder // sql语句
 	sqlVars  []interface{}   // 占位符对应值
 }
+
+// CommonDB是db的最小函数集
+type CommonDB interface {
+	Query(query string, args ...interface{}) (*sql.Rows, error) // 单个查询
+	QueryRow(query string, args ...interface{}) *sql.Row        // 查询一行
+	Exec(query string, args ...interface{}) (sql.Result, error)
+}
+
+// 判断CommonDB是DB还是Tx
+var _ CommonDB = (*sql.DB)(nil)
+var _ CommonDB = (*sql.Tx)(nil)
 
 // 新建一个数据库链接
 func New(db *sql.DB, dialect dialect.Dialect) *Session {
@@ -34,7 +46,10 @@ func (s *Session) Clear() {
 }
 
 // 获取db链接
-func (s *Session) DB() *sql.DB {
+func (s *Session) DB() CommonDB {
+	if s.tx != nil {
+		return s.tx
+	}
 	return s.db
 }
 

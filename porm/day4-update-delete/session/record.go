@@ -1,6 +1,7 @@
 package session
 
 import (
+	"errors"
 	"peeorm/clause"
 	"reflect"
 )
@@ -55,4 +56,93 @@ func (s *Session) Find(values interface{}) error {
 		destSlice.Set(reflect.Append(destSlice, dest))
 	}
 	return rows.Close()
+}
+
+// 传入所有待更新的k-v
+func (s *Session) Update(kv ...interface{}) (int64, error) {
+	// 通过断言判断是否为map[s]interface类型，不是就转换赋值给m一个空的，否则就赋值给已存在的
+	m, ok := kv[0].(map[string]interface{})
+	if !ok {
+		m = make(map[string]interface{})
+		// 遍历所有kv，映射
+		for i := 0; i < len(kv); i += 2 {
+			m[kv[i].(string)] = kv[i+1]
+		}
+	}
+	// 构造更新当前待更新的k-v的子句
+	s.clause.Set(clause.UPDATE, s.RefTable().Name, m)
+	// 构造sql语句
+	sql, vars := s.clause.Build(clause.UPDATE, clause.WHERE)
+	// 执行输出sql语句
+	result, err := s.Raw(sql, vars...).Exec()
+	if err != nil {
+		return 0, err
+	}
+	// 返回受影响的行数
+	return result.RowsAffected()
+}
+
+func (s *Session) Delete() (int64, error) {
+	s.clause.Set(clause.DELETE, s.RefTable().Name)
+	// 构造deletesql语句
+	sql, vars := s.clause.Build(clause.DELETE, clause.WHERE)
+	// 执行 输出
+	result, err := s.Raw(sql, vars...).Exec()
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+func (s *Session) Count() (int64, error) {
+	// 构造子句，SELECT count(*) FROM User
+	s.clause.Set(clause.COUNT, s.refTable.Name)
+	// 根据Count和where构造sql语句
+	sql, vars := s.clause.Build(clause.COUNT, clause.WHERE)
+	// 根据这个sql语句查询对应的列，返回结果集有几行
+	row := s.Raw(sql, vars...).QueryRow()
+	var tmp int64
+	if err := row.Scan(&tmp); err != nil {
+		return 0, err
+	}
+	return tmp, nil
+}
+
+// 将限制条件加入到子句
+func (s *Session) Limit(num int) *Session {
+	s.clause.Set(clause.LIMIT, num)
+	// 对应Sql语句：LIMIT ?
+	return s
+}
+
+// 添加where限制条件
+func (s *Session) Where(desc string, args ...interface{}) *Session {
+	var vars []interface{}
+	// 往vars里面加入传进来的参数，生成where子句
+	s.clause.Set(clause.WHERE, append(append(vars, desc), args...)...)
+	return s
+}
+
+// 添加orderby条件
+func (s *Session) Orderby(desc string) *Session {
+	// 生成Orderby子句
+	s.clause.Set(clause.ORDERBY, desc)
+	return s
+}
+
+func (s *Session) First(value interface{}) error {
+	dest := reflect.Indirect(reflect.ValueOf(value))
+	// 通过反射新建一个dest类型的Slice实例
+	destSlice := reflect.New(reflect.SliceOf(dest.Type())).Elem()
+	// 查找所有记录里面的第一行(使用反射获取地址直接赋值给destSlice)
+	if err := s.Limit(1).Find(destSlice.Addr().Interface()); err != nil {
+		return err
+	}
+	// 如果没有找到
+	if destSlice.Len() == 0 {
+		return errors.New("NOT FOUND")
+	}
+	// 把destSlice第一条数据保存（也就是下标为0的），dest是通过反射获取到的value地址，会保存在value里
+	dest.Set(destSlice.Index(0))
+	return nil
 }

@@ -1,9 +1,9 @@
 package session
 
 import (
-	"day2-reflect-schema/log"
-	"day2-reflect-schema/schema"
 	"fmt"
+	"peeorm/log"
+	"peeorm/schema"
 	"reflect"
 	"strings"
 )

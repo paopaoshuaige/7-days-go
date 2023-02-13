@@ -1,10 +1,10 @@
-package peeorm
+package main
 
 import (
 	"database/sql"
-	"day2-reflect-schema/dialect"
-	"day2-reflect-schema/log"
-	"day2-reflect-schema/session"
+	"peeorm/dialect"
+	"peeorm/log"
+	"peeorm/session"
 )
 
 type Engine struct {

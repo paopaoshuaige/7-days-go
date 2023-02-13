@@ -12,6 +12,31 @@ type Engine struct {
 	dialect dialect.Dialect
 }
 
+type TxFunc func(*session.Session) (interface{}, error)
+
+// 给用户提供的接口，传进来一个函数，里面有数据库的操作
+func (engine *Engine) Transaction(f TxFunc) (reslute interface{}, err error) {
+	// 获取数据库指针
+	s := engine.NewSession()
+	// 启动事务
+	if err := s.Begin(); err != nil {
+		return nil, err
+	}
+	// 通过defer和recover的组合达成事务操作
+	defer func() {
+		if p := recover(); p != nil {
+			_ = s.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = s.Rollback()
+		} else {
+			err = s.Commit()
+		}
+	}()
+
+	return f(s)
+}
+
 // 创建引擎实例并且连接数据库
 func NewEngine(driver, source string) (e *Engine, err error) {
 	db, err := sql.Open(driver, source)

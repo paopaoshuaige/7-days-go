@@ -19,6 +19,9 @@ const (
 	LIMIT
 	WHERE
 	ORDERBY
+	UPDATE
+	DELETE
+	COUNT
 )
 
 // 根据对应的子句生成对应的sql语句

@@ -9,6 +9,7 @@ import (
 func (s *Session) Insert(values ...interface{}) (int64, error) {
 	recordValues := make([]interface{}, 0)
 	for _, value := range values {
+		s.CallMethod(BeforeInsert, value)
 		table := s.Moedl(value).RefTable()                        // 新建一个表并返回（如果是同一个表不新建）
 		s.clause.Set(clause.INSERT, table.Name, table.FieldNames) // 生成Insert子句
 		recordValues = append(recordValues, table.RecordValues(value))
@@ -20,11 +21,13 @@ func (s *Session) Insert(values ...interface{}) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	s.CallMethod(AfterInsert, nil)
 
 	return result.RowsAffected()
 }
 
 func (s *Session) Find(values interface{}) error {
+	s.CallMethod(BeforeQuery, nil)
 	// 获取values（切片）的指针（反射）
 	destSlice := reflect.Indirect(reflect.ValueOf(values))
 	// 获取元素类型（切片的类型的结构体实例，比如传进来destSlice.Type是[]User，那destSlice.Type().Elem()就是User）
@@ -52,6 +55,7 @@ func (s *Session) Find(values interface{}) error {
 		if err := rows.Scan(values...); err != nil {
 			return err
 		}
+		s.CallMethod(AfterQuery, dest.Addr().Interface())
 		// 因为destSlice是外面的切片，dest是存储在切片里的结构体，用反射获取到地址直接加进去就OK
 		destSlice.Set(reflect.Append(destSlice, dest))
 	}
@@ -60,6 +64,7 @@ func (s *Session) Find(values interface{}) error {
 
 // 传入所有待更新的k-v
 func (s *Session) Update(kv ...interface{}) (int64, error) {
+	s.CallMethod(BeforeUpdate, nil)
 	// 通过断言判断是否为map[s]interface类型，不是就转换赋值给m一个空的，否则就赋值给已存在的
 	m, ok := kv[0].(map[string]interface{})
 	if !ok {
@@ -78,11 +83,13 @@ func (s *Session) Update(kv ...interface{}) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	s.CallMethod(AfterUpdate, nil)
 	// 返回受影响的行数
 	return result.RowsAffected()
 }
 
 func (s *Session) Delete() (int64, error) {
+	s.CallMethod(BeforeDelete, nil)
 	s.clause.Set(clause.DELETE, s.RefTable().Name)
 	// 构造deletesql语句
 	sql, vars := s.clause.Build(clause.DELETE, clause.WHERE)
@@ -91,6 +98,7 @@ func (s *Session) Delete() (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	s.CallMethod(AfterDelete, nil)
 	return result.RowsAffected()
 }
 

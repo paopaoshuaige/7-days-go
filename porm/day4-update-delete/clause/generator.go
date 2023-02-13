@@ -17,6 +17,34 @@ func init() {
 	generators[LIMIT] = _limit
 	generators[WHERE] = _where
 	generators[ORDERBY] = _orderBy
+	generators[UPDATE] = _UPDATE
+	generators[DELETE] = _DELETE
+	generators[COUNT] = _COUNT
+}
+
+// 根据表名删除
+func _DELETE(values ...interface{}) (string, []interface{}) {
+	return fmt.Sprintf("DELETE FROM %s", values[0]), []interface{}{}
+}
+
+func _UPDATE(values ...interface{}) (string, []interface{}) {
+	// 获取表名
+	tableName := values[0]
+	// 获取所有待更新的参数，转换成map类型
+	m := values[1].(map[string]interface{})
+	var keys []string
+	var vars []interface{}
+	// 获取所有的key和value
+	for k, v := range m {
+		keys = append(keys, k+" = ?")
+		vars = append(vars, v)
+	}
+	return fmt.Sprintf("UPDATE %s SET %s", tableName, strings.Join(keys, ",")), vars
+}
+
+// 找到的项目数，*代表所有
+func _COUNT(values ...interface{}) (string, []interface{}) {
+	return _select(values[0], []string{"count(*)"})
 }
 
 // 转换成问号

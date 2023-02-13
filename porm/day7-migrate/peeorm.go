@@ -2,9 +2,11 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"peeorm/dialect"
 	"peeorm/log"
 	"peeorm/session"
+	"strings"
 )
 
 type Engine struct {
@@ -35,6 +37,64 @@ func (engine *Engine) Transaction(f TxFunc) (reslute interface{}, err error) {
 	}()
 
 	return f(s)
+}
+
+// 用来计算前后两个字段切片的差集。新表 - 旧表 = 新增字段，旧表 - 新表 = 删除字段。
+func difference(a []string, b []string) (diff []string) {
+	mapB := make(map[string]bool)
+	for _, v := range b {
+		mapB[v] = true
+	}
+	for _, v := range a {
+		if _, ok := mapB[v]; !ok {
+			diff = append(diff, v)
+		}
+	}
+	return
+}
+
+func (engine *Engine) Migrate(value interface{}) error {
+	_, err := engine.Transaction(func(s *session.Session) (result interface{}, err error) {
+		if !s.Moedl(value).HasTable() { // 如果当前表不存在
+			log.Infof("table %s doesn't exist", s.RefTable().Name)
+			return nil, s.CreateTable()
+		}
+
+		table := s.RefTable() // 获取表
+		rows, _ := s.Raw(fmt.Sprintf("SELECT * FROM %s LIMIT 1", table.Name)).QueryRows()
+		// 获取字段名
+		columns, _ := rows.Columns()
+		// 新增字段和删除字段
+		addCols := difference(table.FieldNames, columns)
+		delCols := difference(columns, table.FieldNames)
+		// 新增了哪几列，删除了哪几列
+		log.Infof("added cols %v, deleted cols %v", addCols, delCols)
+
+		// 遍历所有新增的列
+		for _, col := range addCols {
+			// 获取字段
+			f := table.GetField(col)
+			// 加入新的列
+			sqlStr := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;", table.Name, f.Name, f.Type)
+			if _, err = s.Raw(sqlStr).Exec(); err != nil {
+				return
+			}
+		}
+
+		if len(delCols) == 0 { // 如果没有删除就出去
+			return
+		}
+
+		tmp := "tmp_" + table.Name
+		fieldStr := strings.Join(table.FieldNames, ", ")
+		// 删除旧表，给新的重命名
+		s.Raw(fmt.Sprintf("CREATE TABLE %s AS SELECT %s from %s;", tmp, fieldStr, table.Name))
+		s.Raw(fmt.Sprintf("DROP TABLE %s;", table.Name))
+		s.Raw(fmt.Sprintf("ALTER TABLE %s RENAME TO %s;", tmp, table.Name))
+		_, err = s.Exec()
+		return
+	})
+	return err
 }
 
 // 创建引擎实例并且连接数据库

@@ -2,9 +2,10 @@ package session
 
 import (
 	"database/sql"
-	"day2-reflect-schema/dialect"
-	"day2-reflect-schema/log"
-	"day2-reflect-schema/schema"
+	"peeorm/clause"
+	"peeorm/dialect"
+	"peeorm/log"
+	"peeorm/schema"
 	"strings"
 )
 
@@ -12,6 +13,7 @@ type Session struct {
 	db       *sql.DB // 连接数据库之后操作数据库的指针
 	dialect  dialect.Dialect
 	refTable *schema.Schema
+	clause   clause.Clause
 	sql      strings.Builder // sql语句
 	sqlVars  []interface{}   // 占位符对应值
 }
@@ -28,6 +30,7 @@ func New(db *sql.DB, dialect dialect.Dialect) *Session {
 func (s *Session) Clear() {
 	s.sql.Reset()
 	s.sqlVars = nil
+	s.clause = clause.Clause{}
 }
 
 // 获取db链接

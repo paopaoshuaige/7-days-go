@@ -1,4 +1,4 @@
-module day2-reflect-schema
+module peeorm
 
 go 1.19
 

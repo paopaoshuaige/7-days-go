@@ -2,9 +2,9 @@ package session
 
 import (
 	"database/sql"
-	"day2-reflect-schema/dialect"
 	_ "github.com/mattn/go-sqlite3"
 	"os"
+	"peeorm/dialect"
 	"testing"
 )
 
